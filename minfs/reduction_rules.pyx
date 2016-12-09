@@ -16,54 +16,6 @@ from bitpacking.packing cimport PACKED_SIZE
 from bitpacking.packing import packed_type
 
 
-cdef setbits(packed_type_t[:] vec, set positions):
-    cdef:
-        size_t pos, bit, chunk
-    for pos in positions:
-        chunk = pos // PACKED_SIZE
-        bit = pos % PACKED_SIZE
-        vec[chunk] |= (<packed_type_t>1) << bit
-        
-
-cpdef build_coverage_maps(np.uint8_t[:, :] X, np.uint8_t[:] y):
-    cdef:
-        size_t Np, Nf, i, i0, i1, p, f
-        packed_type_t chunk, pmask, fmask
-        packed_type_t[:, :] PF, FP
-        np.uint8_t[:] pattern0, pattern1
-        vector[size_t] class_0_indices, class_1_indices
-
-    Nf = X.shape[1]
-    for i in range(y.shape[0]):
-        if y[i]:
-            class_1_indices.push_back(i)
-        else:
-            class_0_indices.push_back(i)
-    Np = class_0_indices.size() * class_1_indices.size()
-    
-    num_p_chunks = int(ceil(Np / <double>PACKED_SIZE))
-    num_f_chunks = int(ceil(Nf / <double>PACKED_SIZE))
-    # build packed coverages
-    PF = np.zeros((Np, num_f_chunks), dtype=packed_type)
-    FP = np.zeros((Nf, num_p_chunks), dtype=packed_type)
-
-    p = 0
-    for i0 in class_0_indices:
-        pattern0 = X[i0]
-        for i1 in class_1_indices:
-            pattern1 = X[i1]
-            pchunk = p // PACKED_SIZE
-            pmask = (<packed_type_t>1) << (p % PACKED_SIZE)
-            for f in range(Nf):
-                fchunk = f // PACKED_SIZE
-                fmask = (<packed_type_t>1) << (f % PACKED_SIZE)
-                if pattern0[f] != pattern1[f]:
-                    PF[p, fchunk] |= fmask
-                    FP[f, pchunk] |= pmask
-            p += 1
-    return PF, FP
-
-
 cdef set rule1(packed_type_t[:, :] PFcov, packed_type_t[:, :] FPcov, set F, set P):
     cdef:
         size_t j, p, f

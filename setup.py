@@ -16,10 +16,8 @@ args = sys.argv[1:]
 if "clean" in args:
     print("Deleting cython files...")
     to_remove = []
-    # C
-    # C++
-    to_remove += glob.glob('minfs/reduction_rules.cpp')
-    # Static lib files
+    to_remove += glob.glob('minfs/*.c')
+    to_remove += glob.glob('minfs/*.cpp')
     to_remove += glob.glob('minfs/*.so')
     for f in to_remove:
         os.remove(f)
@@ -30,6 +28,10 @@ if args.count('build_ext') > 0 and args.count('--inplace') == 0:
     sys.argv.insert(sys.argv.index('build_ext')+1, '--inplace')
 
 extensions = [
+    Extension('minfs.utils',
+              ['minfs/utils.pyx'],
+              language='c++',
+              include_dirs=include_dirs),
     Extension('minfs.reduction_rules',
               ['minfs/reduction_rules.pyx'],
               language='c++',

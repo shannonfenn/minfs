@@ -1,23 +1,10 @@
 # from boolnet.learning.feature_selection import abk_file, minimum_feature_set
 import minfs.reduction_rules as rr
+import minfs.utils as utils
 import bitpacking.packing as pk
 import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
-
-
-def coverage(features, target):
-    Ne, Nf = features.shape
-    class_0_indices = np.flatnonzero(target == 0)
-    class_1_indices = np.flatnonzero(target)
-    num_eg_pairs = class_0_indices.size * class_1_indices.size
-    coverage_matrix = np.zeros((num_eg_pairs, Nf), dtype=np.uint8)
-    i = 0
-    for i0 in class_0_indices:
-        for i1 in class_1_indices:
-            np.not_equal(features[i0], features[i1], coverage_matrix[i])
-            i += 1
-    return coverage_matrix
 
 
 @pytest.fixture(params=[1, 2, 3, 4, 5])
@@ -37,9 +24,6 @@ def test_packed_method(instance, apply1, apply2, apply3):
     X, y, _ = instance
     C = coverage(X, y)
 
-    print(X.tolist())
-    print(y.tolist())
-
     Np, Nf = C.shape
 
     forced_, F_, P_ = apply(C, apply1, apply2, apply3)
@@ -47,7 +31,7 @@ def test_packed_method(instance, apply1, apply2, apply3):
     forced_ = set(forced_)
     Csub_ = C[sorted(list(P_)), :][:, sorted(list(F_))]
 
-    PFcov, FPcov = rr.build_coverage_maps(X, y)
+    PFcov, FPcov = utils.dual_packed_coverage_maps(X, y)
 
     forced, F, P = rr.apply_reduction_rules(PFcov, FPcov, apply1, apply2, apply3)
 
@@ -56,13 +40,23 @@ def test_packed_method(instance, apply1, apply2, apply3):
 
     assert forced == forced_
     assert F == F_
-    print(F)
-    print(Csub_)
-    print(Csub1)
-    print(Csub2)
     assert P == P_
     assert_array_equal(Csub_, Csub1)
     assert_array_equal(Csub_, Csub2)
+
+
+def coverage(features, target):
+    Ne, Nf = features.shape
+    class_0_indices = np.flatnonzero(target == 0)
+    class_1_indices = np.flatnonzero(target)
+    num_eg_pairs = class_0_indices.size * class_1_indices.size
+    coverage_matrix = np.zeros((num_eg_pairs, Nf), dtype=np.uint8)
+    i = 0
+    for i0 in class_0_indices:
+        for i1 in class_1_indices:
+            np.not_equal(features[i0], features[i1], coverage_matrix[i])
+            i += 1
+    return coverage_matrix
 
 
 # Ground truth methods
