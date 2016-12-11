@@ -111,3 +111,58 @@ cpdef dual_packed_coverage_maps(np.uint8_t[:, :] X, np.uint8_t[:] y):
             p += 1
     return PF, FP
 
+
+def best_repair_features(packed_type_t[:, :] C, size_t Np, set F):
+    cdef:
+        size_t f, Nf, best_num_covered, num_covered, num_uncovered
+        np.ndarray[packed_type_t, ndim=1] covered_pairs, uncovered_pairs
+        set best
+
+    Nf = C.shape[0]
+        
+    # to mask pairs off later in F->P lookup
+    covered_pairs = np.zeros_like(C[0])
+    uncovered_pairs = np.empty_like(covered_pairs)
+    for f in F:
+        np.bitwise_or(covered_pairs, C[f], covered_pairs)
+    np.invert(covered_pairs, uncovered_pairs)
+
+    num_uncovered = bc.popcount_vector(uncovered_pairs)
+    
+    # find feature which covers the most uncovered features
+    best_num_covered = 0
+    best = set()
+    for f in range(Nf):
+        # no need to check if f in F since by definition none of the pairs are covered by F
+        np.bitwise_and(uncovered_pairs, C[f], covered_pairs)
+        num_covered = bc.popcount_vector(covered_pairs)
+        if num_covered > best_num_covered:
+            best_num_covered = num_covered
+            best = {f}
+        elif num_covered == best_num_covered and num_covered > 0:
+            best.add(f)
+
+    return best, best_num_covered, num_uncovered - best_num_covered
+
+
+def deterministic_repair(C, Np, fs):
+    while(not valid_feature_set(C, Np, fs)):
+        best_f, Nc, Nuc = best_repair_features(C, Np, fs)
+        fs.add(min(best_f))
+    return fs
+
+
+def stochastic_repair(C, Np, fs, verbose=False):
+    while(not valid_feature_set(C, Np, fs)):
+        best_f, Nc, Nuc = best_repair_features(C, Np, fs)
+        f = random.choice(tuple(best_f))
+        fs.add(f)
+        if verbose:
+            print(Nc, Nuc, len(fs), '\trandomly chose {} from {}'.format(f, len(best_f)))
+    return fs
+
+
+def grasp_minfs(C, Np):
+    fs = set()
+    stochastic_repair(C, Np, fs)
+    return fs
