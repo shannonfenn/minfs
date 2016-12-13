@@ -36,6 +36,10 @@ extensions = [
               ['minfs/reduction_rules.pyx'],
               language='c++',
               include_dirs=include_dirs),
+    Extension('minfs.fs_solver_raps',
+              ['minfs/fs_solver_raps.pyx'],
+              language='c++',
+              include_dirs=include_dirs),
     ]
 
 setup(
