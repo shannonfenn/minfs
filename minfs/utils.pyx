@@ -10,6 +10,7 @@ cimport bitpacking.packing as pk
 cimport bitpacking.bitcount as bc
 from libc.math cimport ceil
 from libcpp.vector cimport vector
+import random
 
 from bitpacking.packing cimport packed_type_t
 from bitpacking.packing cimport PACKED_SIZE
@@ -112,7 +113,47 @@ cpdef dual_packed_coverage_maps(np.uint8_t[:, :] X, np.uint8_t[:] y):
     return PF, FP
 
 
-def best_repair_features(packed_type_t[:, :] C, size_t Np, set F):
+cpdef redundant_features(packed_type_t[:, :] C, set F):
+    cdef:
+        size_t f
+        np.ndarray[packed_type_t, ndim=1] covered, doubly_covered, temp
+        list redundant
+
+    # to mask pairs off later in F->P lookup
+    covered = np.zeros_like(C[0])
+    doubly_covered = np.zeros_like(C[0])
+    temp = np.empty_like(C[0])
+    for f in F:
+        # mark any already covered features as doubly covered
+        np.bitwise_and(covered, C[f], temp)
+        np.bitwise_or(temp, doubly_covered, doubly_covered)
+        # mark newly covered features as covered
+        np.bitwise_or(covered, C[f], covered)
+
+    # redundant features will only cover pairs that are doubly covered
+    redundant = []
+    for f in F:
+        np.bitwise_and(doubly_covered, C[f], covered)
+        if np.array_equal(C[f], covered):
+            redundant.append(f)
+
+    return redundant
+
+
+cpdef remove_redundant_features(packed_type_t[:, :] C, size_t Np, set F):
+    cdef:
+        size_t f
+        list redundant
+
+    redundant = redundant_features(C, F)
+
+    while(redundant):
+        f = random.choice(redundant)
+        F.discard(f)
+        redundant = redundant_features(C, F)
+
+
+cpdef best_repair_features(packed_type_t[:, :] C, set F):
     cdef:
         size_t f, Nf, best_num_covered, num_covered, num_uncovered
         np.ndarray[packed_type_t, ndim=1] covered_pairs, uncovered_pairs
@@ -145,24 +186,11 @@ def best_repair_features(packed_type_t[:, :] C, size_t Np, set F):
     return best, best_num_covered, num_uncovered - best_num_covered
 
 
-def deterministic_repair(C, Np, fs):
+def greedy_repair(packed_type_t[:, :] C, size_t Np, set fs, bint verbose=False):
     while(not valid_feature_set(C, Np, fs)):
-        best_f, Nc, Nuc = best_repair_features(C, Np, fs)
-        fs.add(min(best_f))
-    return fs
-
-
-def stochastic_repair(C, Np, fs, verbose=False):
-    while(not valid_feature_set(C, Np, fs)):
-        best_f, Nc, Nuc = best_repair_features(C, Np, fs)
+        best_f, Nc, Nuc = best_repair_features(C, fs)
         f = random.choice(tuple(best_f))
         fs.add(f)
         if verbose:
             print(Nc, Nuc, len(fs), '\trandomly chose {} from {}'.format(f, len(best_f)))
-    return fs
-
-
-def grasp_minfs(C, Np):
-    fs = set()
-    stochastic_repair(C, Np, fs)
     return fs
