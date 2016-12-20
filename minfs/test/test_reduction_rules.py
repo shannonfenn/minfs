@@ -1,6 +1,5 @@
 # from boolnet.learning.feature_selection import abk_file, minimum_feature_set
 import minfs.reduction_rules as rr
-import minfs.utils as utils
 import bitpacking.packing as pk
 import numpy as np
 from numpy.testing import assert_array_equal
@@ -31,7 +30,7 @@ def test_packed_method(instance, apply1, apply2, apply3):
     forced_ = set(forced_)
     Csub_ = C[sorted(list(P_)), :][:, sorted(list(F_))]
 
-    PFcov, FPcov = utils.dual_packed_coverage_maps(X, y)
+    PFcov, FPcov = rr.dual_packed_coverage_maps(X, y)
 
     forced, F, P = rr.apply_reduction_rules(PFcov, FPcov, apply1, apply2, apply3)
 
@@ -85,9 +84,9 @@ def reduction2(C):
         for f2 in order[i+1:]:
             # if examples covered by f1 are a subset of those covered by f2
             # then f1 is a redundant feature since f2 covers all its pairs
+            # if np.array_equal(C[:, f1], C[:, f1] * C[:, f2]):
             if all(np.in1d(np.flatnonzero(C[:, f1]),
                            np.flatnonzero(C[:, f2]))):
-            # if np.array_equal(C[:, f1], C[:, f1] * C[:, f2]):
                 redundant_features.add(f1)
                 break
     return sorted(list(redundant_features))
