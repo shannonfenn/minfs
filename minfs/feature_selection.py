@@ -6,6 +6,8 @@ from scipy.stats import entropy
 # import minfs.fs_solver_ortools as fss
 import minfs.fs_solver_cplex as cpx
 import minfs.fs_solver_localsolver as lcs
+import minfs.fs_solver_raps as raps
+import minfs.fs_solver_greedy as greedy
 
 
 def diversity(patterns):
@@ -39,8 +41,7 @@ def unique_pattern_count(all_features, fs_indices):
     return len(counts)
 
 
-def best_feature_set(features, target, metric, prior_soln=None, timelimit=None,
-                     solver='cplex'):
+def best_feature_set(features, target, metric, solver='cplex', params={}):
     ''' Takes a featureset matrix and target vector and finds a minimum FS.
     features    - <2D numpy array> in example x feature format.
     target      - <1D numpy array> of the same number of rows as features
@@ -51,20 +52,22 @@ def best_feature_set(features, target, metric, prior_soln=None, timelimit=None,
         fss = cpx
     elif solver == 'localsolver':
         fss = lcs
+    elif solver == 'raps':
+        fss = raps
+    elif solver == 'greedy':
+        fss = greedy
     else:
-        ValueError('Invalid solver: {}'.format(solver))
+        raise ValueError('Invalid solver: {}'.format(solver))
 
     if metric == 'cardinality>first':
         try:
-            fs = fss.single_minimum_feature_set(features, target,
-                                                prior_soln, timelimit)
+            fs = fss.single_minimum_feature_set(features, target, **params)
         except Exception as e:
             print(e)
             raise e
         return fs, 0
     else:
-        feature_sets = fss.all_minimum_feature_sets(features, target,
-                                                    prior_soln, timelimit)
+        feature_sets = fss.all_minimum_feature_sets(features, target, **params)
         if len(feature_sets) == 0:
             # No feature sets found - likely due to constant target
             return [], None
@@ -91,8 +94,8 @@ def best_feature_set(features, target, metric, prior_soln=None, timelimit=None,
                 metric))
 
 
-def ranked_feature_sets(features, targets, metric, prior_solns=None,
-                        timelimit=None, solver='cplex'):
+def ranked_feature_sets(features, targets, metric, solver='cplex',
+                        params={}, prior_solns=None):
     ''' Takes a featureset matrix and target matrix and finds a minimum FS.
     features    - <2D numpy array> in example x feature format.
     targets     - <2D numpy array> in example x feature format.
@@ -107,16 +110,21 @@ def ranked_feature_sets(features, targets, metric, prior_solns=None,
     cardinalities = np.zeros(Nt)
     secondary_scores = np.zeros(Nt)
 
+    import time
     for i in range(Nt):
-        if prior_solns is None:
-            fs, score = best_feature_set(features, targets[:, i], metric,
-                                         None, timelimit, solver)
-        else:
-            fs, score = best_feature_set(features, targets[:, i], metric,
-                                         prior_solns[i], timelimit, solver)
+        print('target', i)
+        t0 = time.time()
+        if prior_solns is not None:
+            params['prior_soln'] = prior_solns[i]
+        fs, score = best_feature_set(features, targets[:, i], metric,
+                                     solver, params)
+        print(time.time() - t0)
         feature_sets[i] = fs
         cardinalities[i] = len(fs)
         secondary_scores[i] = score
+
+    print('sorting')
+    t0 = time.time()
 
     # sort by first minimising cardinality and then maximising score
     # (keys are reversed in numpy lexsort)
@@ -125,6 +133,7 @@ def ranked_feature_sets(features, targets, metric, prior_solns=None,
     rank = order_to_ranking_with_ties(
         order, lambda i1, i2: (cardinalities[i1] == cardinalities[i2] and
                                secondary_scores[i1] == secondary_scores[i2]))
+    print(time.time() - t0)
 
     return rank, feature_sets
 
