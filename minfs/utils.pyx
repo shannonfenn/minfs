@@ -4,6 +4,7 @@
 # cython: cdivision=True
 # cython: wraparound=False
 # cython: initializedcheck=False
+import cython
 import numpy as np
 cimport numpy as np
 cimport bitpacking.packing as pk
@@ -17,7 +18,37 @@ from bitpacking.packing cimport PACKED_SIZE
 from bitpacking.packing import packed_type
 
 
-def valid_feature_set(packed_type_t[:, :] coverage, size_t Np, set F):
+class PackedCoverageMatrix(np.ndarray):
+    def __new__(cls, input_array, Np):
+        # Input array is an already formed ndarray instance
+        # We first cast to be our class type
+        obj = np.asarray(input_array).view(cls)
+        # add the new attribute to the created instance
+        obj.Np = Np
+        # Finally, we must return the newly created object:
+        return obj
+
+    def __array_finalize__(self, obj):
+        if obj is None:
+            return
+        self.Np = getattr(obj, 'Np', None)
+
+    def __reduce__(self):
+        # Get the parent's __reduce__ tuple
+        pickled_state = super(PackedCoverageMatrix, self).__reduce__()
+        # Create our own tuple to pass to __setstate__
+        new_state = pickled_state[2] + (self.Np, )
+        # Return a tuple that replaces the parent's __setstate__ with our own
+        return (pickled_state[0], pickled_state[1], new_state)
+
+    @cython.wraparound(True) # turn on wraparound for this class
+    def __setstate__(self, state):
+        self.Np = state[-1]  # Set the info attribute
+        # Call the parent's __setstate__ with the other tuple elements.
+        super(PackedCoverageMatrix, self).__setstate__(state[0:-1])
+
+
+def valid_feature_set(np.ndarray[packed_type_t, ndim=2] coverage, set F):
     cdef:
         size_t f
         np.ndarray[packed_type_t, ndim=1] covered_pairs
@@ -27,7 +58,7 @@ def valid_feature_set(packed_type_t[:, :] coverage, size_t Np, set F):
     for f in F:
         np.bitwise_or(covered_pairs, coverage[f], covered_pairs)
     
-    return bc.popcount_vector(covered_pairs) == Np
+    return bc.popcount_vector(covered_pairs) == coverage.Np
 
 
 cpdef packed_coverage_map(np.uint8_t[:, :] X, np.uint8_t[:] y):
@@ -63,57 +94,10 @@ cpdef packed_coverage_map(np.uint8_t[:, :] X, np.uint8_t[:] y):
             # handle rollover into new chunk
             chunk += (mask == 0)
             mask += (mask == 0)
-    return coverage, Np
+    return PackedCoverageMatrix(coverage, Np)
 
 
-cpdef dual_packed_coverage_maps(np.uint8_t[:, :] X, np.uint8_t[:] y):
-    cdef:
-        size_t Np, Nf, i, i1, f, p, num_p_chunks, num_f_chunks, fchunk, pchunk
-        packed_type_t pmask, fmask
-        packed_type_t[:, :] PF, FP
-        vector[size_t] class_0_indices, class_1_indices
-        np.uint8_t[:] pattern0, pattern1
-        np.uint8_t unequal
-
-    Nf = X.shape[1]
-    for i in range(y.shape[0]):
-        if y[i]:
-            class_1_indices.push_back(i)
-        else:
-            class_0_indices.push_back(i)
-
-    Np = class_0_indices.size() * class_1_indices.size()
-    num_p_chunks = int(ceil(Np / <double>PACKED_SIZE))
-    num_f_chunks = int(ceil(Nf / <double>PACKED_SIZE))
-    # build packed coverages
-    PF = np.zeros((Np, num_f_chunks), dtype=packed_type)
-    FP = np.zeros((Nf, num_p_chunks), dtype=packed_type)
-
-    p = 0
-    pchunk = 0
-    pmask = 1
-    for i in class_0_indices:
-        pattern0 = X[i]
-        for i1 in class_1_indices:
-            pattern1 = X[i1]
-            fchunk = 0
-            fmask = 1
-            for f in range(Nf):
-                if pattern0[f] != pattern1[f]:
-                    PF[p, fchunk] |= fmask
-                    FP[f, pchunk] |= pmask
-                fmask <<= 1
-                fchunk += (fmask == 0)
-                fmask += (fmask == 0)
-            pmask <<= 1
-            pchunk += (pmask == 0)
-            pmask += (pmask == 0)
-
-            p += 1
-    return PF, FP
-
-
-cpdef redundant_features(packed_type_t[:, :] C, set F):
+cpdef redundant_features(np.ndarray[packed_type_t, ndim=2] C, set F):
     cdef:
         size_t f
         np.ndarray[packed_type_t, ndim=1] covered, doubly_covered, temp
@@ -140,7 +124,7 @@ cpdef redundant_features(packed_type_t[:, :] C, set F):
     return redundant
 
 
-cpdef remove_redundant_features(packed_type_t[:, :] C, size_t Np, set F):
+cpdef remove_redundant_features(np.ndarray[packed_type_t, ndim=2] C, set F):
     cdef:
         size_t f
         list redundant
@@ -153,44 +137,57 @@ cpdef remove_redundant_features(packed_type_t[:, :] C, size_t Np, set F):
         redundant = redundant_features(C, F)
 
 
-cpdef best_repair_features(packed_type_t[:, :] C, set F):
+cpdef best_repair_features(np.ndarray[packed_type_t, ndim=2] C, set F):
     cdef:
         size_t f, Nf, best_num_covered, num_covered, num_uncovered
         np.ndarray[packed_type_t, ndim=1] covered_pairs, uncovered_pairs
-        set best
+        list best
 
     Nf = C.shape[0]
         
-    # to mask pairs off later in F->P lookup
+    uncovered_pairs = np.empty_like(C[0])
     covered_pairs = np.zeros_like(C[0])
-    uncovered_pairs = np.empty_like(covered_pairs)
     for f in F:
         np.bitwise_or(covered_pairs, C[f], covered_pairs)
     np.invert(covered_pairs, uncovered_pairs)
 
-    num_uncovered = bc.popcount_vector(uncovered_pairs)
-    
+    num_uncovered = bc.popcount_vector(uncovered_pairs) - (PACKED_SIZE - C.Np % PACKED_SIZE) % PACKED_SIZE
+
     # find feature which covers the most uncovered features
     best_num_covered = 0
-    best = set()
+    best = []
     for f in range(Nf):
         # no need to check if f in F since by definition none of the pairs are covered by F
         np.bitwise_and(uncovered_pairs, C[f], covered_pairs)
         num_covered = bc.popcount_vector(covered_pairs)
         if num_covered > best_num_covered:
             best_num_covered = num_covered
-            best = {f}
+            best = [f]
         elif num_covered == best_num_covered and num_covered > 0:
-            best.add(f)
+            best.append(f)
 
     return best, best_num_covered, num_uncovered - best_num_covered
 
 
-def greedy_repair(packed_type_t[:, :] C, size_t Np, set fs, bint verbose=False):
-    while(not valid_feature_set(C, Np, fs)):
+def greedy_repair(np.ndarray[packed_type_t, ndim=2] C, set fs, bint verbose=False):
+    while(not valid_feature_set(C, fs)):
         best_f, Nc, Nuc = best_repair_features(C, fs)
         f = random.choice(tuple(best_f))
         fs.add(f)
         if verbose:
             print(Nc, Nuc, len(fs), '\trandomly chose {} from {}'.format(f, len(best_f)))
     return fs
+
+
+def induced_subproblem(np.ndarray[packed_type_t, ndim=2] C, set F):
+    cdef:
+        np.ndarray[packed_type_t, ndim=1] remaining_pairs
+        list remaining_features
+
+    remaining_features = list(set(range(C.shape[0])) - F)
+    C_sub = C[remaining_features]
+    remaining_pairs = np.zeros_like(C[0])
+    for f in remaining_features:
+        np.bitwise_or(remaining_pairs, C[f], remaining_pairs)
+    Np_sub = bc.popcount_vector(remaining_pairs)
+    return PackedCoverageMatrix(C_sub, Np_sub), remaining_features

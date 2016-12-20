@@ -16,6 +16,53 @@ from bitpacking.packing cimport PACKED_SIZE
 from bitpacking.packing import packed_type
 
 
+cpdef dual_packed_coverage_maps(np.uint8_t[:, :] X, np.uint8_t[:] y):
+    cdef:
+        size_t Np, Nf, i, i1, f, p, num_p_chunks, num_f_chunks, fchunk, pchunk
+        packed_type_t pmask, fmask
+        packed_type_t[:, :] PF, FP
+        vector[size_t] class_0_indices, class_1_indices
+        np.uint8_t[:] pattern0, pattern1
+        np.uint8_t unequal
+
+    Nf = X.shape[1]
+    for i in range(y.shape[0]):
+        if y[i]:
+            class_1_indices.push_back(i)
+        else:
+            class_0_indices.push_back(i)
+
+    Np = class_0_indices.size() * class_1_indices.size()
+    num_p_chunks = int(ceil(Np / <double>PACKED_SIZE))
+    num_f_chunks = int(ceil(Nf / <double>PACKED_SIZE))
+    # build packed coverages
+    PF = np.zeros((Np, num_f_chunks), dtype=packed_type)
+    FP = np.zeros((Nf, num_p_chunks), dtype=packed_type)
+
+    p = 0
+    pchunk = 0
+    pmask = 1
+    for i in class_0_indices:
+        pattern0 = X[i]
+        for i1 in class_1_indices:
+            pattern1 = X[i1]
+            fchunk = 0
+            fmask = 1
+            for f in range(Nf):
+                if pattern0[f] != pattern1[f]:
+                    PF[p, fchunk] |= fmask
+                    FP[f, pchunk] |= pmask
+                fmask <<= 1
+                fchunk += (fmask == 0)
+                fmask += (fmask == 0)
+            pmask <<= 1
+            pchunk += (pmask == 0)
+            pmask += (pmask == 0)
+
+            p += 1
+    return PF, FP
+
+
 cdef set rule1(packed_type_t[:, :] PFcov, packed_type_t[:, :] FPcov, set F, set P):
     cdef:
         size_t j, p, f
