@@ -4,6 +4,9 @@
 # cython: cdivision=True
 # cython: wraparound=False
 # cython: initializedcheck=False
+# cython: profile=True
+
+
 import cython
 import numpy as np
 cimport numpy as np
@@ -31,7 +34,10 @@ class PackedCoverageMatrix(np.ndarray):
     def __array_finalize__(self, obj):
         if obj is None:
             return
-        self.Np = getattr(obj, 'Np', None)
+        try:
+            self.Np = obj.Np
+        except:
+            self.Np = None
 
     def __reduce__(self):
         # Get the parent's __reduce__ tuple
@@ -97,6 +103,16 @@ cpdef packed_coverage_map(np.uint8_t[:, :] X, np.uint8_t[:] y):
     return PackedCoverageMatrix(coverage, Np)
 
 
+cdef bint _arr_eq(np.ndarray[packed_type_t, ndim=1] x, np.ndarray[packed_type_t, ndim=1] y):
+    cdef:
+        size_t i
+
+    for i in range(x.shape[0]):
+        if x[i] != y[i]:
+            return False
+    return True
+
+
 cpdef redundant_features(np.ndarray[packed_type_t, ndim=2] C, set F):
     cdef:
         size_t f
@@ -118,7 +134,8 @@ cpdef redundant_features(np.ndarray[packed_type_t, ndim=2] C, set F):
     redundant = []
     for f in F:
         np.bitwise_and(doubly_covered, C[f], covered)
-        if np.array_equal(C[f], covered):
+        # if np.array_equal(C[f], covered):
+        if _arr_eq(C[f], covered):
             redundant.append(f)
 
     return redundant
@@ -141,17 +158,21 @@ cpdef best_repair_features(np.ndarray[packed_type_t, ndim=2] C, set F):
     cdef:
         size_t f, Nf, best_num_covered, num_covered, num_uncovered
         np.ndarray[packed_type_t, ndim=1] covered_pairs, uncovered_pairs
+        packed_type_t[:] covered_pairs_memvw, uncovered_pairs_memvw
         list best
 
     Nf = C.shape[0]
         
     uncovered_pairs = np.empty_like(C[0])
     covered_pairs = np.zeros_like(C[0])
+    uncovered_pairs_memvw = uncovered_pairs
+    covered_pairs_memvw = covered_pairs
+    
     for f in F:
         np.bitwise_or(covered_pairs, C[f], covered_pairs)
     np.invert(covered_pairs, uncovered_pairs)
 
-    num_uncovered = bc.popcount_vector(uncovered_pairs) - (PACKED_SIZE - C.Np % PACKED_SIZE) % PACKED_SIZE
+    num_uncovered = bc.popcount_vector(uncovered_pairs_memvw) - (PACKED_SIZE - C.Np % PACKED_SIZE) % PACKED_SIZE
 
     # find feature which covers the most uncovered features
     best_num_covered = 0
@@ -159,7 +180,7 @@ cpdef best_repair_features(np.ndarray[packed_type_t, ndim=2] C, set F):
     for f in range(Nf):
         # no need to check if f in F since by definition none of the pairs are covered by F
         np.bitwise_and(uncovered_pairs, C[f], covered_pairs)
-        num_covered = bc.popcount_vector(covered_pairs)
+        num_covered = bc.popcount_vector(covered_pairs_memvw)
         if num_covered > best_num_covered:
             best_num_covered = num_covered
             best = [f]
@@ -181,6 +202,7 @@ def greedy_repair(np.ndarray[packed_type_t, ndim=2] C, set fs, bint verbose=Fals
 
 def induced_subproblem(np.ndarray[packed_type_t, ndim=2] C, set F):
     cdef:
+        size_t f
         np.ndarray[packed_type_t, ndim=1] remaining_pairs
         list remaining_features
 

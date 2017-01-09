@@ -3,8 +3,17 @@ import bitpacking.bitcount as bc
 import minfs.utils as utils
 import random
 
+cimport numpy as np
+from bitpacking.packing cimport packed_type_t
 
-def construction(C, priority, restriction):
+
+cpdef construction(np.ndarray[packed_type_t, ndim=2] C, double priority, double restriction):
+    cdef:
+        packed_type_t[:, :] C_memvw
+        size_t f, Nf
+
+    C_memvw = C
+
     assert 0 <= priority <= 1 and 0 <= restriction <= 1
     fs = set()
     Nf = C.shape[0]
@@ -12,7 +21,7 @@ def construction(C, priority, restriction):
         candidates, Ncov, _ = utils.best_repair_features(C, fs)
         if random.random() >= priority:
             threshold = Ncov * (1 - restriction)
-            candidates = [f for f in range(Nf) if bc.popcount_vector(C[f]) >= threshold]
+            candidates = [f for f in range(Nf) if bc.popcount_vector(C_memvw[f]) >= threshold]
         f = random.choice(candidates)
         fs.add(f)
     utils.remove_redundant_features(C, fs)
