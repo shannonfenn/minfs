@@ -5,7 +5,7 @@
 # cython: wraparound=False
 # cython: initializedcheck=False
 
-# cython: profile=True
+# cython: profile=False
 
 import cython
 import numpy as np
