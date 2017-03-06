@@ -41,7 +41,8 @@ def unique_pattern_count(all_features, fs_indices):
     return len(counts)
 
 
-def best_feature_set(features, target, metric, solver='cplex', params={}):
+def best_feature_set(features, target, metric='cardinality>first',
+                     solver='cplex', params={}):
     ''' Takes a featureset matrix and target vector and finds a minimum FS.
     features    - <2D numpy array> in example x feature format.
     target      - <1D numpy array> of the same number of rows as features
@@ -94,8 +95,8 @@ def best_feature_set(features, target, metric, solver='cplex', params={}):
                 metric))
 
 
-def ranked_feature_sets(features, targets, metric, solver='cplex',
-                        params={}, prior_solns=None):
+def ranked_feature_sets(features, targets, metric='cardinality>first',
+                        solver='cplex', params={}, prior_solns=None):
     ''' Takes a featureset matrix and target matrix and finds a minimum FS.
     features    - <2D numpy array> in example x feature format.
     targets     - <2D numpy array> in example x feature format.
