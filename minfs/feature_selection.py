@@ -111,21 +111,14 @@ def ranked_feature_sets(features, targets, metric='cardinality>first',
     cardinalities = np.zeros(Nt)
     secondary_scores = np.zeros(Nt)
 
-    import time
     for i in range(Nt):
-        print('target', i)
-        t0 = time.time()
         if prior_solns is not None:
             params['prior_soln'] = prior_solns[i]
         fs, score = best_feature_set(features, targets[:, i], metric,
                                      solver, params)
-        print(time.time() - t0)
         feature_sets[i] = fs
         cardinalities[i] = len(fs)
         secondary_scores[i] = score
-
-    print('sorting')
-    t0 = time.time()
 
     # sort by first minimising cardinality and then maximising score
     # (keys are reversed in numpy lexsort)
@@ -134,7 +127,6 @@ def ranked_feature_sets(features, targets, metric='cardinality>first',
     rank = order_to_ranking_with_ties(
         order, lambda i1, i2: (cardinalities[i1] == cardinalities[i2] and
                                secondary_scores[i1] == secondary_scores[i2]))
-    print(time.time() - t0)
 
     return rank, feature_sets
 
