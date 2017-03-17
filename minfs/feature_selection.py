@@ -131,25 +131,17 @@ def ranked_feature_sets(features, targets, metric='cardinality>first',
     return rank, feature_sets
 
 
-def inverse_permutation(permutation):
-    inverse = np.zeros_like(permutation)
-    for i, p in enumerate(permutation):
-        inverse[p] = i
-    return inverse
-
-
 def order_to_ranking_with_ties(order, tied):
     # build ranking from the above order (with ties)
     ranking = np.zeros(len(order), dtype=int)
-    inverse_order = inverse_permutation(order)
 
     # check ranking from 2nd element in order
     # first element is rank 0 automatically by np.zeros
     for i in range(1, len(order)):
-        i1 = inverse_order[i-1]
-        i2 = inverse_order[i]
+        i1 = order[i-1]
+        i2 = order[i]
         if tied(i1, i2):
-            # tie
+            # tie - continuing using current ranking
             ranking[i2] = ranking[i1]
         else:
             ranking[i2] = i
