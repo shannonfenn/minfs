@@ -5,7 +5,7 @@ from scipy.stats import entropy
 # from minfs.fs_solver_numberjack as fss
 # import minfs.fs_solver_ortools as fss
 import minfs.fs_solver_cplex as cpx
-import minfs.fs_solver_localsolver as lcs
+# import minfs.fs_solver_localsolver as lcs
 import minfs.fs_solver_raps as raps
 import minfs.fs_solver_greedy as greedy
 
@@ -51,8 +51,8 @@ def best_feature_set(features, target, metric='cardinality>first',
                   according to given metric.'''
     if solver == 'cplex':
         fss = cpx
-    elif solver == 'localsolver':
-        fss = lcs
+    # elif solver == 'localsolver':
+    #     fss = lcs
     elif solver == 'raps':
         fss = raps
     elif solver == 'greedy':
