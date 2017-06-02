@@ -24,6 +24,8 @@ def single_minimum_feature_set(features, target, prior_soln=None,
 
     if timelimit is not None:
         model.parameters.timelimit.set(timelimit)
+        # prevent multithreading
+        model.parameters.threads.set(1)
 
     if not debug:
         # stop cplex chatter
