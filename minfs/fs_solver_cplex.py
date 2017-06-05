@@ -13,19 +13,16 @@ def single_minimum_feature_set(features, target, prior_soln=None,
         # constant target - no solutions
         return []
 
-    coverage = sparse_coverage(features, target)
-    Np = len(coverage)
-    Nf = features.shape[1]
-
     # coverage = build_coverage(features, target)
     # coverage = coverage_generator(features, target)
 
     model = cplex.Cplex()
 
+    # prevent multithreading
+    model.parameters.threads.set(1)
+
     if timelimit is not None:
         model.parameters.timelimit.set(timelimit)
-        # prevent multithreading
-        model.parameters.threads.set(1)
 
     if not debug:
         # stop cplex chatter
@@ -33,6 +30,10 @@ def single_minimum_feature_set(features, target, prior_soln=None,
         model.set_warning_stream(None)
         model.set_error_stream(None)
         model.set_log_stream(None)
+
+    coverage = sparse_coverage(features, target)
+    Np = len(coverage)
+    Nf = features.shape[1]
 
     model.objective.set_sense(model.objective.sense.minimize)
 
