@@ -99,6 +99,7 @@ def ranked_feature_sets(features, targets, metric='cardinality>first',
                         solver='cplex', params={}, prior_solns=None):
     ''' Takes a featureset matrix and target matrix and finds a minimum FS.
     features    - <2D numpy array> in example x feature format.
+                - OR a list of such arrays of length = |targets|
     targets     - <2D numpy array> in example x feature format.
     metric      - <string> which metric to use to pick best feature set.
     returns     - (<permutation>, <list of 1D numpy arrays>)
@@ -111,11 +112,17 @@ def ranked_feature_sets(features, targets, metric='cardinality>first',
     cardinalities = np.zeros(Nt)
     secondary_scores = np.zeros(Nt)
 
-    for i in range(Nt):
+    if isinstance(features, np.ndarray):
+        # generator to give the same feature matrix for all targets
+        X = (features for i in range(Nt))
+    else:
+        X = features
+        assert len(X) == Nt
+
+    for i, x in enumerate(X):
         if prior_solns is not None:
             params['prior_soln'] = prior_solns[i]
-        fs, score = best_feature_set(features, targets[:, i], metric,
-                                     solver, params)
+        fs, score = best_feature_set(x, targets[:, i], metric, solver, params)
         feature_sets[i] = fs
         cardinalities[i] = len(fs)
         secondary_scores[i] = score
