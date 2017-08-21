@@ -25,7 +25,8 @@ cdef class SetCoverSolution:
         public set features
         public utils.SetCoverInstance instance
         public size_t[:] num_will_cover
-        public packed_type_t[:] covered, doubly_covered, uncovered, temp, temp2, end_mask
+        public packed_type_t[:] covered, doubly_covered, uncovered
+        public packed_type_t[:] temp, temp2, end_mask
 
     def __init__(self, instance):
         self.features = set()
@@ -96,16 +97,15 @@ cdef class SetCoverSolution:
         # temp  : the inverse of C[f]
         # temp2 : mask for updating covered
 
-        # remove the feature - will raise an error if feature not present (desired - since this
-        # would break the coverage update below)
+        # remove the feature - will error if not present
+        # (desired - since otherwise would break the coverage update below)
         self.features.remove(f)
         # get mask for which features are not left uncovered
         np.bitwise_not(C_np[f], temp_np)
         np.bitwise_or(temp_np, doubly_covered_np, temp2_np)
-        # apply mask 
+        # apply mask
         np.bitwise_and(temp2_np, covered_np, covered_np)
         np.bitwise_not(covered_np, uncovered_np)
-
 
     cpdef remove_redundant(self):
         redundant = utils.get_redundant_feature(
@@ -138,11 +138,12 @@ cpdef repair(SetCoverSolution soln, double priority, double restriction):
     while(not soln.satisfied()):
         # count number of uncovered pairs that each feature would cover
         for f in range(Nf):
-            # no need to check if f in current FS since by definition none of the pairs are covered
+            # no need to check if f in current FS since by
+            # definition none of these pairs are covered
             np.bitwise_and(uncovered_np, C_np[f], temp_np)
             num_will_cover_np[f] = bc.popcount_vector(soln.temp)
         max_covered = num_will_cover_np.max()
-    
+
         threshold = max_covered
         if random.random() >= priority:
             threshold *= (1 - restriction)
@@ -214,14 +215,16 @@ def _solve(instance, iterations, improvement_iterations, search_magnitude,
         min_k_constructed = min(min_k_constructed, len(soln.features))
         # if this is nearly as small as the smallest seen after construction
         if len(soln.features) <= (1 + improvement) * min_k_constructed:
-            local_search(soln, improvement_iterations, search_magnitude, priority, restriction) 
+            local_search(soln, improvement_iterations, search_magnitude,
+                         priority, restriction)
         if len(soln.features) < len(best):
             best = set(soln.features)
     return best
 
 
-def single_minimum_feature_set(X, y, iterations=20, improvement_iterations=100, search_magnitude=0.3,
-          priority=0.05, restriction=0.15, improvement=0.15):
+def single_minimum_feature_set(X, y, iterations=20, improvement_iterations=100,
+                               search_magnitude=0.3, priority=0.05,
+                               restriction=0.15, improvement=0.15):
     X = X.astype(np.uint8)
     y = y.astype(np.uint8)
 
