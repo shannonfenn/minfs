@@ -4,25 +4,15 @@
   Author: Shannon Fenn (shannon.fenn@gmail.com)
 """
 import cplex
+from cplex.exceptions import CplexSolverError
 import numpy as np
 
 
-def single_minimum_feature_set(features, target, prior_soln=None,
-                               timelimit=None, debug=False):
-    if np.all(target) or not np.any(target):
-        # constant target - no solutions
-        return []
-
-    # coverage = build_coverage(features, target)
-    # coverage = coverage_generator(features, target)
-
+def build_minfs_model(features, target, prior_soln, debug=False):
     model = cplex.Cplex()
 
     # prevent multithreading
     model.parameters.threads.set(1)
-
-    if timelimit is not None:
-        model.parameters.timelimit.set(timelimit)
 
     if not debug:
         # stop cplex chatter
@@ -59,17 +49,23 @@ def single_minimum_feature_set(features, target, prior_soln=None,
         model.MIP_starts.add([list(range(Nf)), x_.tolist()],
                              model.MIP_starts.effort_level.check_feasibility)
 
-    # import time
-    # t0 = time.time()
+    return model
 
-    # print('model built')
+
+def single_minimum_feature_set(features, target, prior_soln=None,
+                               timelimit=None, debug=False):
+    if np.all(target) or not np.any(target):
+        # constant target - no solutions
+        return []
+
+    model = build_minfs_model(features, target, prior_soln, debug)
+
+    if timelimit is not None:
+        model.parameters.timelimit.set(timelimit)
 
     model.solve()
 
     status = model.solution.get_status()
-
-    # print(time.time() - t0, '' if status == model.solution.status.MIP_optimal
-    #                            else 'Non-optimal')
 
     if status in [model.solution.status.MIP_optimal,
                   model.solution.status.MIP_time_limit_feasible]:
@@ -79,6 +75,64 @@ def single_minimum_feature_set(features, target, prior_soln=None,
         fs = []
 
     return fs
+
+
+def all_minimum_feature_sets(features, target, intensity=2, prior_soln=None,
+                             timelimit=None, debug=False):
+    if np.all(target) or not np.any(target):
+        # constant target - no solutions
+        return []
+
+    model = build_minfs_model(features, target, prior_soln, debug)
+
+    if timelimit is not None:
+        model.parameters.timelimit.set(timelimit)
+
+    # guide suggests this to get all solutions:
+    # https://www.ibm.com/support/knowledgecenter/ru/SSSA5P_12.4.0/ilog.odms.cplex.help/CPLEX/UsrMan/topics/discr_optim/soln_pool/18_howTo.html
+    model.parameters.mip.pool.absgap.set(0)
+    model.parameters.mip.pool.intensity.set(0)
+    model.parameters.mip.limits.populate.set(2100000000)
+
+    try:
+        model.populate_solution_pool()
+    except CplexSolverError:
+        print("Exception raised during populate")
+        return
+
+    # Print information about other solutions
+    print()
+    numsol = model.solution.pool.get_num()
+    print("The solution pool contains %d solutions." % numsol)
+
+    numsolreplaced = model.solution.pool.get_num_replaced()
+    print("%d solutions were removed due to the solution pool "
+          "relative gap parameter." % numsolreplaced)
+
+    numsoltotal = numsol + numsolreplaced
+    print("In total, %d solutions were generated." % numsoltotal)
+
+    meanobjval = model.solution.pool.get_mean_objective_value()
+    print("The average objective value of the solutions is %.10g." %
+          meanobjval)
+
+    status = model.solution.get_status()
+    print()
+    # solution.get_status() returns an integer code
+    print("Solution status = ", status, ":", end=' ')
+    # the following line prints the corresponding string
+    print(model.solution.status[status])
+
+    if status not in [model.solution.status.optimal_populated,
+                      model.solution.status.optimal_populated_tolerance,
+                      model.solution.status.MIP_optimal,
+                      model.solution.status.MIP_time_limit_feasible]:
+        print('Warning (all_minimum_feature_sets): possible non-optimal solutions.')
+    F = []
+    for i in range(numsol):
+        x = model.solution.pool.get_values(i)
+        F.append(np.where(x)[0].tolist())
+    return F
 
 
 # def all_minimum_feature_sets(features, target):

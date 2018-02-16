@@ -17,28 +17,43 @@ def diversity(patterns):
     return total
 
 
-def feature_diversity(all_features, fs_indices):
-    return diversity(all_features[:, fs_indices].T)
-
-
-def pattern_diversity(all_features, fs_indices):
-    return diversity(all_features[:, fs_indices])
-
-
-def feature_set_entropy(all_features, fs_indices):
-    fs = all_features[:, fs_indices]
+def hypercube_entropy(X):
     counts = defaultdict(int)
-    for pattern in fs:
+    for pattern in X:
         counts[tuple(pattern)] += 1
     return entropy(list(counts.values()), base=2)
 
 
-def unique_pattern_count(all_features, fs_indices):
-    fs = all_features[:, fs_indices]
+def unique_pattern_count(X):
     counts = defaultdict(int)
-    for pattern in fs:
+    for pattern in X:
         counts[tuple(pattern)] = 1
     return len(counts)
+
+
+def missing_pattern_count(X):
+    return 2**X.shape[1] - unique_pattern_count(X)
+
+
+def binary_entropy(v):
+    p = sum(v) / len(v)
+    if p == 0 or p == 1:
+        return 0.0
+    else:
+        return - p*np.log2(p) - (1-p)*np.log2(1-p)
+
+
+def info_gain(x, y):
+    ent = binary_entropy(y)
+    y0 = y[x == 0]
+    y1 = y[x == 1]
+    ent0 = binary_entropy(y0)
+    ent1 = binary_entropy(y1)
+    return ent - len(y0)/len(y)*ent0 - len(y1)/len(y)*ent1
+
+
+def information_gain_score(X, y):
+    return sum(info_gain(x, y) for x in X.T) / X.shape[1]
 
 
 def best_feature_set(features, target, metric='cardinality>first',
@@ -66,30 +81,52 @@ def best_feature_set(features, target, metric='cardinality>first',
         except Exception as e:
             print(e)
             raise e
-        return fs, 0
+        return fs, 0, 1
     else:
         feature_sets = fss.all_minimum_feature_sets(features, target, **params)
         if len(feature_sets) == 0:
             # No feature sets found - likely due to constant target
-            return [], None
+            return [], None, 1
+        
         elif metric == 'cardinality>random':
             rand_index = np.random.randint(len(feature_sets))
-            return feature_sets[rand_index], 0
-        elif metric == 'cardinality>entropy':
-            entropies = [feature_set_entropy(features, fs)
+            return feature_sets[rand_index], 0, len(feature_sets)
+        
+        elif metric == 'cardinality>hypercube_entropy':
+            entropies = [hypercube_entropy(features[:, fs])
                          for fs in feature_sets]
             best_fs = np.argmax(entropies)
-            return feature_sets[best_fs], entropies[best_fs]
+            return feature_sets[best_fs], entropies[best_fs], len(feature_sets)
+        
         elif metric == 'cardinality>feature_diversity':
-            feature_diversities = [feature_diversity(features, fs)
-                                   for fs in feature_sets]
-            best_fs = np.argmax(feature_diversities)
-            return feature_sets[best_fs], feature_diversities[best_fs]
+            # feature diversity can be found by pattern diversity of X.transp
+            scores = [diversity(features[:, fs].T) for fs in feature_sets]
+            best_fs = np.argmax(scores)
+            return feature_sets[best_fs], scores[best_fs], len(feature_sets)
+        
         elif metric == 'cardinality>pattern_diversity':
-            pattern_diversities = [pattern_diversity(features, fs)
-                                   for fs in feature_sets]
-            best_fs = np.argmax(pattern_diversities)
-            return feature_sets[best_fs], pattern_diversities[best_fs]
+            scores = [diversity(features[:, fs]) for fs in feature_sets]
+            best_fs = np.argmax(scores)
+            return feature_sets[best_fs], scores[best_fs], len(feature_sets)
+        
+        elif metric == 'cardinality>silhouette':
+            scores = [metric.silhouette_score(features[:, fs], target)
+                      for fs in feature_sets]
+            best_fs = np.argmax(scores)
+            return feature_sets[best_fs], scores[best_fs], len(feature_sets)
+        
+        elif metric == 'cardinality>information_gain':
+            scores = [information_gain_score(features[:, fs], fs)
+                         for fs in feature_sets]
+            best_fs = np.argmax(scores)
+            return feature_sets[best_fs], scores[best_fs], len(feature_sets)
+        
+        elif metric == 'cardinality>missing_patterns':
+            scores = [missing_pattern_count(features[:, fs], fs)
+                         for fs in feature_sets]
+            best_fs = np.argmin(scores)
+            return feature_sets[best_fs], scores[best_fs], len(feature_sets)
+
         else:
             raise ValueError('Invalid fs selection metric : {}'.format(
                 metric))
@@ -122,7 +159,7 @@ def ranked_feature_sets(features, targets, metric='cardinality>first',
     for i, x in enumerate(X):
         if prior_solns is not None:
             params['prior_soln'] = prior_solns[i]
-        fs, score = best_feature_set(x, targets[:, i], metric, solver, params)
+        fs, score, _ = best_feature_set(x, targets[:, i], metric, solver, params)
         feature_sets[i] = fs
         cardinalities[i] = len(fs)
         secondary_scores[i] = score
