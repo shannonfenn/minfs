@@ -56,6 +56,14 @@ def information_gain_score(X, y):
     return sum(info_gain(x, y) for x in X.T) / X.shape[1]
 
 
+def is_valid(X, y):
+    X0 = X[y == 0, :]
+    X1 = X[y == 1, :]
+    X0 = X0.view([('', X0.dtype)] * X0.shape[1])
+    X1 = X1.view([('', X1.dtype)] * X1.shape[1])
+    return 0 == len(np.intersect1d(X0, X1))
+
+
 def best_feature_set(features, target, metric='cardinality>first',
                      solver='cplex', params={}):
     ''' Takes a featureset matrix and target vector and finds a minimum FS.
