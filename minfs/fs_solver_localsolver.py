@@ -28,7 +28,7 @@ def build_model(M, T, model):
     return x
 
 
-def single_minimum_feature_set(M, T, prior_soln=None, timelimit=None, debug=False):
+def single_minfs(M, T, prior_soln=None, timelimit=None, debug=False):
     if not (0 < T.sum() < len(T)):
         # constant target
         return []

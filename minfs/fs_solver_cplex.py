@@ -52,8 +52,8 @@ def build_minfs_model(features, target, prior_soln, debug=False):
     return model
 
 
-def single_minimum_feature_set(features, target, prior_soln=None,
-                               timelimit=None, debug=False):
+def single_minfs(features, target, prior_soln=None,
+                 timelimit=None, debug=False):
     if np.all(target) or not np.any(target):
         # constant target - no solutions
         return []
@@ -77,8 +77,8 @@ def single_minimum_feature_set(features, target, prior_soln=None,
     return fs
 
 
-def all_minimum_feature_sets(features, target, intensity=2, prior_soln=None,
-                             timelimit=None, debug=False):
+def all_minfs(features, target, intensity=2, prior_soln=None,
+              timelimit=None, debug=False):
     if np.all(target) or not np.any(target):
         # constant target - no solutions
         return []

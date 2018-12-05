@@ -2,7 +2,7 @@ import numpy as np
 import minfs.utils as utils
 
 
-def single_minimum_feature_set(X, y):
+def single_minfs(X, y):
     X = X.astype(np.uint8)
     y = y.astype(np.uint8)
 

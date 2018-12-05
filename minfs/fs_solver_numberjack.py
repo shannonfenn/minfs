@@ -7,7 +7,7 @@ import Numberjack as nj
 import numpy as np
 
 
-def all_minimum_feature_sets(features, target):
+def all_minfs(features, target):
     if np.all(target) or not np.any(target):
         # constant target
         return [list(range(features.shape[1]))]

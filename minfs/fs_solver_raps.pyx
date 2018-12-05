@@ -222,9 +222,9 @@ def _solve(instance, iterations, improvement_iterations, search_magnitude,
     return best
 
 
-def single_minimum_feature_set(X, y, iterations=20, improvement_iterations=100,
-                               search_magnitude=0.3, priority=0.05,
-                               restriction=0.15, improvement=0.15):
+def single_minfs(X, y, iterations=20, improvement_iterations=100,
+                 search_magnitude=0.3, priority=0.05,
+                 restriction=0.15, improvement=0.15):
     X = X.astype(np.uint8)
     y = y.astype(np.uint8)
 

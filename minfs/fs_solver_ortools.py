@@ -7,7 +7,7 @@ from ortools.constraint_solver import pywrapcp
 import numpy as np
 
 
-def single_minimum_feature_set(features, target):
+def single_minfs(features, target):
     if np.all(target) or not np.any(target):
         # constant target - no solutions
         return []
@@ -16,7 +16,7 @@ def single_minimum_feature_set(features, target):
     return solution
 
 
-def all_minimum_feature_sets(features, target):
+def all_minfs(features, target):
     if np.all(target) or not np.any(target):
         # constant target - no solutions
         return []

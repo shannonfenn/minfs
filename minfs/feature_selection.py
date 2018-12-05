@@ -77,53 +77,55 @@ def best_feature_set(features, target, metric='cardinality>first',
 
     if metric == 'cardinality>first':
         try:
-            fs = fss.single_minimum_feature_set(features, target, **params)
+            fs = fss.single_minfs(features, target, prior_soln=prior_soln,
+                                  **solver_params)
         except Exception as e:
             print(e)
             raise e
         return fs, 0, 1
     else:
-        feature_sets = fss.all_minimum_feature_sets(features, target, **params)
+        feature_sets = fss.all_minfs(features, target, prior_soln=prior_soln,
+                                     **solver_params)
         if len(feature_sets) == 0:
             # No feature sets found - likely due to constant target
             return [], None, 1
-        
+
         elif metric == 'cardinality>random':
             rand_index = np.random.randint(len(feature_sets))
             return feature_sets[rand_index], 0, len(feature_sets)
-        
+
         elif metric == 'cardinality>hypercube_entropy':
             entropies = [hypercube_entropy(features[:, fs])
                          for fs in feature_sets]
             best_fs = np.argmax(entropies)
             return feature_sets[best_fs], entropies[best_fs], len(feature_sets)
-        
+
         elif metric == 'cardinality>feature_diversity':
             # feature diversity can be found by pattern diversity of X.transp
             scores = [diversity(features[:, fs].T) for fs in feature_sets]
             best_fs = np.argmax(scores)
             return feature_sets[best_fs], scores[best_fs], len(feature_sets)
-        
+
         elif metric == 'cardinality>pattern_diversity':
             scores = [diversity(features[:, fs]) for fs in feature_sets]
             best_fs = np.argmax(scores)
             return feature_sets[best_fs], scores[best_fs], len(feature_sets)
-        
+
         elif metric == 'cardinality>silhouette':
             scores = [metric.silhouette_score(features[:, fs], target)
                       for fs in feature_sets]
             best_fs = np.argmax(scores)
             return feature_sets[best_fs], scores[best_fs], len(feature_sets)
-        
+
         elif metric == 'cardinality>information_gain':
             scores = [information_gain_score(features[:, fs], fs)
-                         for fs in feature_sets]
+                      for fs in feature_sets]
             best_fs = np.argmax(scores)
             return feature_sets[best_fs], scores[best_fs], len(feature_sets)
-        
+
         elif metric == 'cardinality>missing_patterns':
             scores = [missing_pattern_count(features[:, fs], fs)
-                         for fs in feature_sets]
+                      for fs in feature_sets]
             best_fs = np.argmin(scores)
             return feature_sets[best_fs], scores[best_fs], len(feature_sets)
 

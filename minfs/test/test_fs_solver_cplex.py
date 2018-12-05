@@ -5,7 +5,7 @@ from numpy.testing import assert_array_equal
 import pytest
 
 
-# @fixture
+def test_single_minfs(instance):
 # def tmpfilename():
 #     random_suffix = ''.join(str(i) for i in np.random.randint(0, 9, 10))
 #     return '/tmp/shantemp' + random_suffix
@@ -31,20 +31,17 @@ def instance(request):
 #     assert expected == actual
 
 
-def test_min_fs(instance):
     features, target, all_expected = instance
-
-    actual = fss.single_minimum_feature_set(features, target)
-
+    actual = fss.single_minfs(features, target)
     # check the expected minfs is one of the returned
     assert any(np.array_equal(actual, expected) for expected in all_expected)
 
 
 @pytest.mark.skip
-def test_all_min_fs(instance):
+def test_all_minfs(instance):
     features, target, expected = instance
 
-    actual = fss.all_minimum_feature_sets(features, target)
+    actual = fss.all_minfs(features, target)
 
     # check the expected minfs is one of the returned
     assert_array_equal(sorted(expected.tolist()),
