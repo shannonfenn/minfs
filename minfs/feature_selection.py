@@ -65,7 +65,7 @@ def is_valid(X, y):
 
 
 def best_feature_set(features, target, metric='cardinality>first',
-                     solver='cplex', params={}):
+                     solver='cplex', solver_params={}, prior_soln=None):
     ''' Takes a featureset matrix and target vector and finds a minimum FS.
     features    - <2D numpy array> in example x feature format.
     target      - <1D numpy array> of the same number of rows as features
@@ -143,10 +143,10 @@ def best_feature_set(features, target, metric='cardinality>first',
 
 
 def ranked_feature_sets(features, targets, metric='cardinality>first',
-                        solver='cplex', params={}, prior_solns=None):
+                        solver='cplex', solver_params={}, prior_solns=None):
     ''' Takes a featureset matrix and target matrix and finds a minimum FS.
     features    - <2D numpy array> in example x feature format.
-                - OR a list of such arrays of length = |targets|
+                - OR a iterable of such arrays of length = |targets|
     targets     - <2D numpy array> in example x feature format.
     metric      - <string> which metric to use to pick best feature set.
     returns     - (<permutation>, <list of 1D numpy arrays>)
@@ -167,9 +167,9 @@ def ranked_feature_sets(features, targets, metric='cardinality>first',
         assert len(X) == Nt
 
     for i, x in enumerate(X):
-        if prior_solns is not None:
-            params['prior_soln'] = prior_solns[i]
-        fs, score, _ = best_feature_set(x, targets[:, i], metric, solver, params)
+        prior = prior_solns[i] if prior_solns is not None else None
+        fs, score, _ = best_feature_set(x, targets[:, i], metric, solver,
+                                        solver_params, prior)
         feature_sets[i] = fs
         cardinalities[i] = len(fs)
         secondary_scores[i] = score
@@ -182,7 +182,7 @@ def ranked_feature_sets(features, targets, metric='cardinality>first',
         order, lambda i1, i2: (cardinalities[i1] == cardinalities[i2] and
                                secondary_scores[i1] == secondary_scores[i2]))
 
-    return rank, feature_sets
+    return rank, feature_sets, secondary_scores
 
 
 def order_to_ranking_with_ties(order, tied):
