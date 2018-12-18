@@ -1,3 +1,4 @@
+import random
 import numpy as np
 from itertools import combinations
 from collections import defaultdict
@@ -99,7 +100,7 @@ def best_feature_set(features, target, metric='cardinality>first',
             return [], None, 1
 
         elif metric == 'cardinality>random':
-            rand_index = np.random.randint(len(feature_sets))
+            rand_index = random.randrange(len(feature_sets))
             return feature_sets[rand_index], 0, len(feature_sets)
 
         elif metric == 'cardinality>hypercube_entropy':
@@ -214,7 +215,8 @@ def rank_with_ties_broken(ranking_with_ties):
     ranks, counts = np.unique(ranking_with_ties, return_counts=True)
     for rank, count in zip(ranks, counts):
         indices = np.where(ranking_with_ties == rank)
-        perm = np.random.permutation(count) + rank
+        perm = list(range(rank, rank+count))
+        random.shuffle(perm)
         new_ranking[indices] = perm
     return new_ranking
 
