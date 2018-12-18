@@ -201,9 +201,12 @@ def local_search(soln, imp_iterations, search_magnitude, priority, restriction):
 
 
 def _solve(instance, iterations, improvement_iterations, search_magnitude,
-           priority, restriction, improvement):
-    min_k_constructed = instance.Nf
-    best = set(range(min_k_constructed))
+           priority, restriction, improvement, prior_soln):
+    if prior_soln:
+        best = set(prior_soln)
+    else:
+        best = set(range(instance.Nf))
+    min_k_constructed = len(best)
     soln = SetCoverSolution(instance)
     for i in range(iterations):
         # print('main iteration', i)
@@ -224,7 +227,7 @@ def _solve(instance, iterations, improvement_iterations, search_magnitude,
 
 def single_minfs(X, y, iterations=20, improvement_iterations=100,
                  search_magnitude=0.3, priority=0.05,
-                 restriction=0.15, improvement=0.15):
+                 restriction=0.15, improvement=0.15, prior_soln=None):
     X = X.astype(np.uint8)
     y = y.astype(np.uint8)
 
@@ -235,6 +238,6 @@ def single_minfs(X, y, iterations=20, improvement_iterations=100,
     instance = utils.build_instance(X, y)
 
     F = _solve(instance, iterations, improvement_iterations, search_magnitude,
-               priority, restriction, improvement)
+               priority, restriction, improvement, prior_soln)
 
     return list(F)
