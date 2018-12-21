@@ -70,7 +70,7 @@ def single_minfs(features, target, prior_soln=None,
     if status in [model.solution.status.MIP_optimal,
                   model.solution.status.MIP_time_limit_feasible]:
         x = model.solution.get_values()
-        fs = np.where(x)[0].tolist()
+        fs = sorted(np.where(x)[0])
     else:
         fs = []
 
@@ -131,7 +131,7 @@ def all_minfs(features, target, intensity=2, prior_soln=None,
     F = []
     for i in range(numsol):
         x = model.solution.pool.get_values(i)
-        F.append(np.where(x)[0].tolist())
+        F.append(sorted(np.where(x)[0]))
     return F
 
 

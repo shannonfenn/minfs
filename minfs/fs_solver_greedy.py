@@ -13,4 +13,4 @@ def single_minfs(X, y):
     C, Np = utils.packed_coverage_map(X, y)
     fs = set()
     utils.greedy_repair(C, Np, fs)
-    return list(fs)
+    return sorted(fs)

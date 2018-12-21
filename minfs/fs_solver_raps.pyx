@@ -240,4 +240,4 @@ def single_minfs(X, y, iterations=20, improvement_iterations=100,
     F = _solve(instance, iterations, improvement_iterations, search_magnitude,
                priority, restriction, improvement, prior_soln)
 
-    return list(F)
+    return sorted(F)
